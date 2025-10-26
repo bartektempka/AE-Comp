@@ -1,2 +1,8 @@
 # pyenv-virtualenv
 .python-version
+
+# saved models
+saved_models
+
+# VS Code workspace settings
+.vscode/
