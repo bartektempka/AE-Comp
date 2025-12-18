@@ -41,3 +41,36 @@ def read_dataset(
         dataset_dict[dataset_name_formatted] = (train_data, test_data, test_labels)
 
     return dataset_dict
+
+
+def read_dataset_semisupervised(
+    dataset_name: str,
+    size_limit: int | None = None,
+    anomaly_fraction: float = 0.01,
+) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
+
+    dataset_dict = read_dataset(dataset_name, size_limit)
+    # move some anomalies to training set
+    for key in dataset_dict.keys():
+        train_data, test_data, test_labels = dataset_dict[key]
+        n_anomalies = np.sum(test_labels)
+        if n_anomalies == 0:
+            continue
+        anomaly_indices = np.where(test_labels == 1)[0]
+        n_to_move = max(1, int(anomaly_fraction * n_anomalies))
+        indices_to_move = anomaly_indices[:n_to_move]
+
+        new_train_data = np.vstack((train_data, test_data[indices_to_move]))
+        train_labels = np.zeros(train_data.shape[0] + n_to_move)
+        train_labels[-n_to_move:] = 1  # Mark moved anomalies in training labels
+        new_test_data = np.delete(test_data, indices_to_move, axis=0)
+        new_test_labels = np.delete(test_labels, indices_to_move, axis=0)
+
+        dataset_dict[key] = (
+            new_train_data,
+            train_labels,
+            new_test_data,
+            new_test_labels,
+        )
+
+    return dataset_dict
