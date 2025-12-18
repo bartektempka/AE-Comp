@@ -6,3 +6,14 @@ saved_models
 
 # VS Code workspace settings
 .vscode/
+
+#TSB-AD datasets
+TSB-AD-M/
+
+#pyorch lightning
+lightning_logs/
+
+#venv
+.venv/
+
+__pycache__
