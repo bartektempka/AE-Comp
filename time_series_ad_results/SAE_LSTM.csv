@@ -1,0 +1,17 @@
+dataset,roc_auc,test_set
+MSL,0.626413160274612,unsupervised_test
+MSL,0.6267866565117857,semisupervised_test
+MITDB,0.6497360731022426,unsupervised_test
+MITDB,0.6490719740776476,semisupervised_test
+GHL,0.472986642975997,unsupervised_test
+GHL,0.4730270719515175,semisupervised_test
+SMD,0.6598853645023955,unsupervised_test
+SMD,0.6599059585245564,semisupervised_test
+SVDB,0.5576156714693425,unsupervised_test
+SVDB,0.5579313398367813,semisupervised_test
+OPPORTUNITY,0.3646147711163012,unsupervised_test
+OPPORTUNITY,0.3650614655989068,semisupervised_test
+CATSv2,0.5334641718318602,unsupervised_test
+CATSv2,0.5360201040165518,semisupervised_test
+SMAP,0.597206699457396,unsupervised_test
+SMAP,0.5981615023853367,semisupervised_test

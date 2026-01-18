@@ -12,7 +12,13 @@ def read_dataset(
 
     dataset_filesnames = []
 
-    for filename in os.listdir("../TSB-AD-M"):
+    try:
+        dataset_dir = os.listdir("../TSB-AD-M")
+        dataset_path = "../TSB-AD-M"
+    except FileNotFoundError:
+        dataset_dir = os.listdir("TSB-AD-M")
+        dataset_path = "TSB-AD-M"
+    for filename in dataset_dir:
         match = re.match(r"(.*)_" + re.escape(dataset_name) + r"_id_.+_.*", filename)
         if match:
             dataset_filesnames.append(filename)
@@ -25,7 +31,7 @@ def read_dataset(
     ):
         print(filename)
         traning_index = filename.split(".")[0].split("_")[-3]
-        df = pd.read_csv(os.path.join("../TSB-AD-M", filename)).dropna()
+        df = pd.read_csv(os.path.join(dataset_path, filename)).dropna()
         train_data = df.iloc[: int(traning_index), :-1].values.astype(float)
         test_data = df.iloc[int(traning_index) :, :-1].values.astype(float)
         test_labels = df.iloc[int(traning_index) :, -1].values.astype(int)

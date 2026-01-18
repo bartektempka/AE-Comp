@@ -1,6 +1,3 @@
-import torch.nn as nn
-import pytorch_lightning as pl
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -8,9 +5,10 @@ from torch.utils.data import DataLoader, TensorDataset
 import pytorch_lightning as pl
 
 
-class SemisupervisedLSTMAE(pl.LightningModule):
+class AE_LSTM(pl.LightningModule):
     def __init__(self, seq_len, n_features, hidden_size, num_layers=1, lr=0.001):
-        super(SemisupervisedLSTMAE, self).__init__()
+        super(AE_LSTM, self).__init__()
+        self.save_hyperparameters()
         self.seq_len = seq_len
         self.n_features = n_features
         self.hidden_size = hidden_size
@@ -35,45 +33,41 @@ class SemisupervisedLSTMAE(pl.LightningModule):
         self.fc = nn.Linear(hidden_size, n_features)
         self.lr = lr
 
+        self.test_errors = []
+
     def forward(self, x):
         batch_size = x.size(0)
         seq_len = x.size(1)
 
         _, hidden = self.encoder(x)
 
-        decoder_input = torch.zeros(batch_size, 1, self.n_features).to(self.device)
-        outputs = torch.zeros_like(x).to(self.device)
+        decoder_input = torch.zeros(batch_size, seq_len, self.n_features).to(self.device)
+        
+        decoder_output, hidden = self.decoder(decoder_input, hidden)
+        decoder_output = self.fc(self.relu(decoder_output))
 
-        for t in range(seq_len):
-            decoder_output, hidden = self.decoder(decoder_input, hidden)
-            decoder_input = self.fc(self.relu(decoder_output))
-            outputs[:, t, :] = decoder_input.squeeze(1)
-
-        assert (
-            outputs.shape == x.shape
-        ), f"Output shape {outputs.shape} does not match input shape {x.shape}"
-
-        return outputs
+        return decoder_output
 
     def training_step(self, batch, batch_idx):
-        (x, y) = batch
+        (x,_) = batch
         x_hat = self.forward(x)
-        loss = (1 - y).unsqueeze(-1) * nn.MSELoss(reduction="none")(
-            x_hat, x
-        ) + y.unsqueeze(-1) * 10 * nn.MSELoss(reduction="none")(x_hat, 1 - x)
-        loss = loss.mean()
+        loss = nn.MSELoss()(x_hat, x)
         self.log("train_loss", loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        (x, y) = batch
+        (x,_) = batch
         x_hat = self.forward(x)
-        loss = (1 - y).unsqueeze(-1) * nn.MSELoss(reduction="none")(
-            x_hat, x
-        ) + y.unsqueeze(-1) * 10 * nn.MSELoss(reduction="none")(x_hat, 1 - x)
+        loss = nn.MSELoss()(x_hat, x)
         self.log("val_loss", loss)
         return loss
-
+    
+    def test_step(self, batch, batch_idx):
+        x, = batch
+        x_hat = self(x)
+        rec_error = ((x - x_hat) ** 2).mean(dim=2, keepdim=True)
+        self.test_errors.append(rec_error.cpu())
+        
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
         return optimizer

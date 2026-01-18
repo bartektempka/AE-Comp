@@ -12,6 +12,7 @@ def kl_divergence(mu, logvar):
 class VAE_LSTM(pl.LightningModule):
     def __init__(self, seq_len, n_features, hidden_size, latent_dim, lr=0.001):
         super(VAE_LSTM, self).__init__()
+        self.save_hyperparameters()
         self.seq_len = seq_len
         self.n_features = n_features
         self.hidden_size = hidden_size
@@ -43,6 +44,8 @@ class VAE_LSTM(pl.LightningModule):
         self.fc = nn.Linear(hidden_size, n_features)
         self.lr = lr
 
+        self.test_errors = []
+
     def reparameterize(self, mu, logvar):
         """Reparameterization trick: z = mu + std * epsilon"""
         std = torch.exp(0.5 * logvar)
@@ -55,12 +58,9 @@ class VAE_LSTM(pl.LightningModule):
 
         # Encode
         _, (h, c) = self.encoder(x)
-        # print(f"Encoder hidden state shape: {h.shape}")
-        # print(f"Encoder cell state shape: {c.shape}")
         h_last = h[-1]  # Get the last layer's hidden state
         c_last = c[-1]  # Get the last layer's cell state
         combined_hidden = torch.cat((h_last, c_last), dim=1)
-        # print(f"Combined hidden state shape: {combined_hidden.shape}")
 
         # Get latent parameters
         mu = self.fc_mu(combined_hidden)
@@ -68,42 +68,39 @@ class VAE_LSTM(pl.LightningModule):
 
         # Sample from latent space
         z = self.reparameterize(mu, logvar)
-        # print(f"Latent vector shape: {z.shape}")
 
         # Decode
         h_dec = self.fc_latent_to_hidden(z).unsqueeze(0)
         c_dec = self.fc_latent_to_hidden(z).unsqueeze(0)
 
-        decoder_input = torch.zeros(batch_size, 1, self.n_features).to(self.device)
-        outputs = torch.zeros_like(x).to(self.device)
+        decoder_input = torch.zeros(batch_size, seq_len, self.n_features).to(self.device)
 
         hidden_state = (h_dec, c_dec)
+        
+        decoder_output, hidden_state = self.decoder(decoder_input, hidden_state)
+        decoder_output = self.fc(self.relu(decoder_output))
 
-        for t in range(seq_len):
-            decoder_output, hidden_state = self.decoder(decoder_input, hidden_state)
-            decoder_input = self.fc(self.relu(decoder_output))
-            outputs[:, t, :] = decoder_input.squeeze(1)
-
-        assert (
-            outputs.shape == x.shape
-        ), f"Output shape {outputs.shape} does not match input shape {x.shape}"
-
-        # return outputs, mu, logvar
-        return outputs, mu, logvar
+        return decoder_output, mu, logvar
 
     def training_step(self, batch, batch_idx):
-        (x,) = batch
+        (x,_) = batch
         x_hat, mu, logvar = self.forward(x)
         loss = nn.MSELoss()(x_hat, x) + kl_divergence(mu, logvar)
         self.log("train_loss", loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        (x,) = batch
+        (x,_) = batch
         x_hat, mu, logvar = self.forward(x)
         loss = nn.MSELoss()(x_hat, x) + kl_divergence(mu, logvar)
         self.log("val_loss", loss)
         return loss
+    
+    def test_step(self, batch, batch_idx):
+        x, = batch
+        x_hat, *rest = self(x)
+        rec_error = ((x - x_hat) ** 2).mean(dim=2, keepdim=True)
+        self.test_errors.append(rec_error.cpu())
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
