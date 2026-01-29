@@ -336,8 +336,15 @@ parser.add_argument(
 )
 args = parser.parse_args()
 experiment_number = args.experiment_number
+if experiment_number != 0:
+    raise ValueError("Only experiment_number 0 is supported in this setup.")
 
-model, dataset = list(itertools.product(models, datasets))[experiment_number]
-print(f"Running experiment for model: {model}, dataset: {dataset}")
-train_model(model, dataset, epoch=50)
-test_model(model, dataset, True)
+for model, dataset in itertools.product(models, datasets):
+    print(f"Running experiment for model: {model}, dataset: {dataset}")
+    # train_model(model, dataset, epoch=50)
+    test_model(model, dataset, True)
+
+# model, dataset = list(itertools.product(models, datasets))[experiment_number]
+# print(f"Running experiment for model: {model}, dataset: {dataset}")
+# train_model(model, dataset, epoch=50)
+# test_model(model, dataset, True)
