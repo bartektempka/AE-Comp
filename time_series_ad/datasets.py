@@ -3,10 +3,12 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+from utils import create_sequences
 
 
 def read_dataset(
     dataset_name: str,
+    return_windowed: bool = False,
     size_limit: int | None = None,
 ) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
 
@@ -44,7 +46,18 @@ def read_dataset(
         data_set_name_split = dataset_name.split("_")
         dataset_name_formatted = f"{data_set_name_split[1]}_id_{data_set_name_split[3]}"
 
-        dataset_dict[dataset_name_formatted] = (train_data, test_data, test_labels)
+        if return_windowed:
+            dataset_dict[dataset_name_formatted] = (
+                create_sequences(train_data, 50),
+                create_sequences(test_data, 50),
+                create_sequences(test_labels, 50),
+            )
+        else:
+            dataset_dict[dataset_name_formatted] = (
+                train_data,
+                test_data,
+                test_labels,
+            )
 
     return dataset_dict
 
@@ -55,7 +68,9 @@ def read_dataset_semisupervised(
     anomaly_fraction: float = 0.01,
 ) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
 
-    dataset_dict = read_dataset(dataset_name, size_limit)
+    dataset_dict = read_dataset(
+        dataset_name, return_windowed=False, size_limit=size_limit
+    )
     # move some anomalies to training set
     for key in dataset_dict.keys():
         train_data, test_data, test_labels = dataset_dict[key]
@@ -64,19 +79,35 @@ def read_dataset_semisupervised(
             continue
         anomaly_indices = np.where(test_labels == 1)[0]
         n_to_move = max(1, int(anomaly_fraction * n_anomalies))
-        indices_to_move = anomaly_indices[:n_to_move]
+        last_anomaly_index = anomaly_indices[
+            min(n_to_move - 1, len(anomaly_indices) - 1)
+        ]
 
-        new_train_data = np.vstack((train_data, test_data[indices_to_move]))
-        train_labels = np.zeros(train_data.shape[0] + n_to_move)
-        train_labels[-n_to_move:] = 1  # Mark moved anomalies in training labels
-        new_test_data = np.delete(test_data, indices_to_move, axis=0)
-        new_test_labels = np.delete(test_labels, indices_to_move, axis=0)
+        normal_train_seq = create_sequences(train_data, 50)
+        normal_train_labels = np.zeros(normal_train_seq.shape[:2])
+        train_data_with_anomalies = test_data[: last_anomaly_index + 1]
+        train_labels_with_anomalies = test_labels[: last_anomaly_index + 1]
+        train_data_with_anomalies_seq = create_sequences(train_data_with_anomalies, 50)
+        train_labels_with_anomalies_seq = create_sequences(
+            train_labels_with_anomalies, 50
+        )
+
+        full_train_data = np.vstack((normal_train_seq, train_data_with_anomalies_seq))
+        full_train_labels = np.vstack(
+            (normal_train_labels, train_labels_with_anomalies_seq)
+        )
+
+        test_data = test_data[last_anomaly_index + 1 :]
+        test_labels = test_labels[last_anomaly_index + 1 :]
+
+        test_data_seq = create_sequences(test_data, 50)
+        test_labels_seq = create_sequences(test_labels, 50)
 
         dataset_dict[key] = (
-            new_train_data,
-            train_labels,
-            new_test_data,
-            new_test_labels,
+            full_train_data,
+            full_train_labels,
+            test_data_seq,
+            test_labels_seq,
         )
 
     return dataset_dict
