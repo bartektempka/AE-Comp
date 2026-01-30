@@ -321,13 +321,6 @@ datasets = [
 ]
 models = ["SAE_LSTM", "AE_LSTM", "VAE_LSTM"]
 import itertools
-
-# for model, dataset in itertools.product(models, datasets):
-#     print(f"Running experiment for model: {model}, dataset: {dataset}")
-#     train_model(model, dataset, epoch=50)
-#     # test_model(model, dataset, False)
-#     test_model(model, dataset, True)
-
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -341,10 +334,5 @@ if experiment_number != 0:
 
 for model, dataset in itertools.product(models, datasets):
     print(f"Running experiment for model: {model}, dataset: {dataset}")
-    # train_model(model, dataset, epoch=50)
+    train_model(model, dataset, epoch=50)
     test_model(model, dataset, True)
-
-# model, dataset = list(itertools.product(models, datasets))[experiment_number]
-# print(f"Running experiment for model: {model}, dataset: {dataset}")
-# train_model(model, dataset, epoch=50)
-# test_model(model, dataset, True)
